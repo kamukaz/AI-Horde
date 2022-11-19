@@ -832,10 +832,19 @@ class Index:
 
 class PromptsIndex(Index):
 
-    def count_waiting_requests(self, user):
+    def count_waiting_requests(self, user, models = []):
         count = 0
         for wp in list(self._index.values()):
             if wp.user == user and not wp.is_completed():
+                # If we pass a list of models, we want to count only the WP for these particular models.
+                if len(models) > 0:
+                    matching_model = False
+                    for model in models:
+                        if model in wp.models:
+                            matching_model = True
+                            break
+                    if not matching_model:
+                        continue
                 count += wp.n
         return(count)
 

@@ -116,7 +116,7 @@ class GenerateTemplate(Resource):
         self.username = self.user.get_unique_alias()
         if self.args['prompt'] == '':
             raise e.MissingPrompt(self.username)
-        wp_count = waiting_prompts.count_waiting_requests(self.user)
+        wp_count = waiting_prompts.count_waiting_requests(self.user,self.args["models"])
         if len(self.workers):
             for worker_id in self.workers:
                 if not db.find_worker_by_id(worker_id):
