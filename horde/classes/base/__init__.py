@@ -786,11 +786,14 @@ class Worker:
         self.blacklist = saved_dict.get("blacklist",[])
         self.ipaddr = saved_dict.get("ipaddr", None)
         self.suspicions = saved_dict.get("suspicions", [])
-        old_model = saved_dict.get("model")
-        self.models = saved_dict.get("models", [old_model])
-        for suspicion in self.suspicions:
+        for suspicion in self.suspicions.copy():
+            if convert_flag == "clean_dropped_jobs":
+                self.suspicions.remove(suspicion)
+                continue
             self.suspicious += 1
             logger.debug(f"Suspecting worker {self.name} for {self.suspicious} with reasons {self.suspicions}")
+        old_model = saved_dict.get("model")
+        self.models = saved_dict.get("models", [old_model])
         self.check_for_bad_actor()
         if convert_flag == "prune_bad_worker" and not self.is_suspicious():
             self.db.workers[self.name] = self
@@ -1298,7 +1301,11 @@ class User:
         self.worker_invited = int(saved_dict.get("worker_invited", 0))
         self.suspicions = saved_dict.get("suspicions", [])
         self.contact = saved_dict.get("contact",None)
-        for suspicion in self.suspicions:
+        for suspicion in self.suspicions.copy():
+            if convert_flag == "clean_dropped_jobs":
+                if suspicion == 9:
+                    self.suspicions.remove(suspicion)
+                    continue
             self.suspicious += 1
             logger.debug(f"Suspecting user {self.get_unique_alias()} for {self.suspicious} with reasons {self.suspicions}")
         self.public_workers = saved_dict.get("public_workers", False)
