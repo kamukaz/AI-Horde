@@ -63,6 +63,7 @@ class WaitingPrompt:
         self.set_job_ttl()
         # How many kudos this request consumed until now
         self.consumed_kudos = 0
+        self.lock = threading.Lock()
 
     # These are typically worker-specific so they will be defined in the specific class for this horde type
     def extract_params(self, params, **kwargs):
@@ -97,14 +98,15 @@ class WaitingPrompt:
         return(False)
 
     def start_generation(self, worker):
-        if self.n <= 0:
-            return
-        new_gen = self.new_procgen(worker)
-        self.processing_gens.append(new_gen)
-        self.n -= 1
-        self.refresh()
-        logger.audit(f"Procgen with ID {new_gen.id} popped from WP {self.id} by worker {worker.id} ('{worker.name}' / {worker.ipaddr})")
-        return(self.get_pop_payload(new_gen))
+        with self.lock:
+            if self.n <= 0:
+                return
+            new_gen = self.new_procgen(worker)
+            self.processing_gens.append(new_gen)
+            self.n -= 1
+            self.refresh()
+            logger.audit(f"Procgen with ID {new_gen.id} popped from WP {self.id} by worker {worker.id} ('{worker.name}' / {worker.ipaddr})")
+            return(self.get_pop_payload(new_gen))
 
     def fake_generation(self, worker):
         new_gen = self.new_procgen(worker)
