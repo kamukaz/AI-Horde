@@ -426,6 +426,7 @@ class Worker:
     suspicion_threshold = 3
     # Every how many seconds does this worker get a kudos reward
     uptime_reward_threshold = 600
+    default_maintenance_msg = "This worker has been put into maintenance mode by its owner"
 
     def __init__(self, db):
         self.last_reward_uptime = 0
@@ -452,6 +453,7 @@ class Worker:
         self.db = db
         self.bridge_version = 1
         self.threads = 1
+        self.maintenance_msg = self.default_maintenance_msg
 
     def create(self, user, name, **kwargs):
         self.user = user
@@ -533,6 +535,13 @@ class Worker:
     # This should be overwriten by each specific horde
     def calculate_uptime_reward(self):
         return(100)
+
+    def toggle_maintenance(self, is_maintenance_active, maintenance_msg = None):
+        self.maintenance = is_maintenance_active
+        self.maintenance_msg = self.default_maintenance_msg
+        if self.maintenance and maintenance_msg is not None:
+            self.maintenance_msg = bleach.clean(maintenance_msg)
+
 
     # This should be extended by each specific horde
     def check_in(self, **kwargs):
@@ -648,7 +657,19 @@ class Worker:
             self.aborted_jobs = 0
         self.aborted_jobs += 1
         self.last_aborted_job = datetime.now()
-        if self.aborted_jobs > 5:
+        # These are accumulating too fast at 5. Increasing to 20
+        dropped_job_threshold = 10
+        if raid.active:
+            dropped_job_threshold = 5
+        if self.aborted_jobs > dropped_job_threshold:
+            # if a worker drops too many jobs in an hour, we put them in maintenance
+            # except during a raid, as we don't want them to know we detected them.
+            if not raid.active:
+                self.toggle_maintenance(
+                    True, 
+                    "Maintenance mode activated because worker is dropping too many jobs."
+                    "Please investigate if your performance has been impacted and consider reducing your max_power or your max_threads"
+                )
             self.report_suspicion(reason = Suspicions.TOO_MANY_JOBS_ABORTED)
             self.aborted_jobs = 0
         self.uncompleted_jobs += 1

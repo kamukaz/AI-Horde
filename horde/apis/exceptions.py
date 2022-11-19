@@ -102,8 +102,8 @@ class NotTrusted(wze.Forbidden):
         self.log = None
 
 class WorkerMaintenance(wze.Forbidden):
-    def __init__(self, worker_id):
-        self.specific = f"worker {worker_id} has been put into maintenance by its owner"
+    def __init__(self, maintenance_msg):
+        self.specific = maintenance_msg
         self.log = None
 
 class TooManySameIPs(wze.Forbidden):

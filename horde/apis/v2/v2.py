@@ -337,7 +337,7 @@ class JobPop(Resource):
             return(self.start_worker(wp), 200)
         # We report maintenance exception only if we couldn't find any jobs
         if self.worker.maintenance:
-            raise e.WorkerMaintenance(self.worker.id)
+            raise e.WorkerMaintenance(self.worker.maintenance_msg)
         return({"id": None, "skipped": self.skipped}, 200)
 
     # Making it into its own function to allow extension
@@ -497,6 +497,7 @@ class WorkerSingle(Resource):
     put_parser = reqparse.RequestParser()
     put_parser.add_argument("apikey", type=str, required=True, help="The Moderator or Owner API key", location='headers')
     put_parser.add_argument("maintenance", type=bool, required=False, help="Set to true to put this worker into maintenance.", location="json")
+    put_parser.add_argument("maintenance_msg", type=str, required=False, help="if maintenance is True, You can optionally provide a message to be used instead of the default maintenance message, so that the owner is informed", location="json")
     put_parser.add_argument("paused", type=bool, required=False, help="Set to true to pause this worker.", location="json")
     put_parser.add_argument("info", type=str, required=False, help="You can optionally provide a server note which will be seen in the server details. No profanity allowed!", location="json")
     put_parser.add_argument("name", type=str, required=False, help="When this is set, it will change the worker's name. No profanity allowed!", location="json")
@@ -530,7 +531,7 @@ class WorkerSingle(Resource):
             if not os.getenv("ADMINS") or admin.get_unique_alias() not in json.loads(os.getenv("ADMINS")):
                 if admin != worker.user:
                     raise e.NotOwner(admin.get_unique_alias(), worker.name)
-            worker.maintenance = self.args.maintenance
+            worker.toggle_maintenance(self.args.maintenance, self.args.maintenance_msg)
             ret_dict["maintenance"] = worker.maintenance
         # Only owners can set info notes
         if self.args.info != None:
