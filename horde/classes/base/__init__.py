@@ -1145,7 +1145,11 @@ class User:
         allowed_concurrency = 0
         for model_name in models_requested:
             # We allow 10 concurrency per worker serving that model
-            allowed_concurrency += models_dict.get(model_name,{"count":0})["count"] * 10
+            count = 0
+            model_dict = models_dict.get(model_name)
+            if model_dict:
+                count = model_dict["count"]
+            allowed_concurrency += count * 10
         # logger.debug([allowed_concurrency,models_dict.get(model_name,{"count":0})["count"]])
         return(allowed_concurrency)
             
