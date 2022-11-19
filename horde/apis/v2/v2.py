@@ -879,7 +879,7 @@ class HordeModes(Resource):
         if self.args.shutdown != None:
             if not os.getenv("ADMINS") or admin.get_unique_alias() not in json.loads(os.getenv("ADMINS")):
                 raise e.NotAdmin(admin.get_unique_alias(), 'PUT HordeModes')
-            maintenance.toggle(self.args.maintenance)
+            maintenance.activate()
             for wp in waiting_prompts.get_all():
                 wp.abort_for_maintenance()
             db.shutdown(self.args.shutdown)
