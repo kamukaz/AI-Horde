@@ -1142,14 +1142,15 @@ class User:
     def get_concurrency(self, models_requested = [], models_dict = {}):
         if not self.is_anon():
             return(self.concurrency)
-        allowed_concurrency = 0
+        found_workers = []
         for model_name in models_requested:
-            # We allow 10 concurrency per worker serving that model
-            count = 0
             model_dict = models_dict.get(model_name)
             if model_dict:
-                count = model_dict["count"]
-            allowed_concurrency += count * 10
+                for worker in model_dict["workers"]:
+                    if worker not in found_workers:
+                        found_workers.append(worker)
+        # We allow 10 concurrency per worker serving the models requested
+        allowed_concurrency = len(found_workers) * 10
         # logger.debug([allowed_concurrency,models_dict.get(model_name,{"count":0})["count"]])
         return(allowed_concurrency)
             
@@ -1681,7 +1682,7 @@ class Database:
             time.sleep(1)
             self.save_progress += 1
 
-    def initiate_save(self, seconds):
+    def initiate_save(self, seconds = 3):
         logger.success(f"Initiating save in {seconds} seconds")
         if seconds > self.interval:
             second = self.interval
@@ -1878,7 +1879,7 @@ class Database:
 
     def get_available_models(self, waiting_prompts, lite_dict=False):
         models_dict = {}
-        for worker in self.workers.values():
+        for worker in list(self.workers.values()):
             if worker.is_stale():
                 continue
             model_name = None
@@ -1888,12 +1889,14 @@ class Database:
                 mode_dict_template = {
                     "name": model_name,
                     "count": 0,
+                    "workers": [],
                     "performance": self.stats.get_model_avg(model_name),
                     "queued": 0,
                     "eta": 0,
                 }
                 models_dict[model_name] = models_dict.get(model_name, mode_dict_template)
                 models_dict[model_name]["count"] += worker.threads
+                models_dict[model_name]["workers"].append(worker)
         if lite_dict:
             return(models_dict)
         things_per_model = waiting_prompts.count_things_per_model()
