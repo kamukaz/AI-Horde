@@ -657,11 +657,11 @@ class Worker:
         self.kudos_details[action] = round(self.kudos_details.get(action,0) + abs(kudos), 2) 
 
     def log_aborted_job(self):
-        # If the last aborted job was an hour ago, we reset the counter
+        # We count the number of jobs aborted in an 1 hour period. So we only log the new timer each time an hour expires.
         if (datetime.now() - self.last_aborted_job).seconds > 3600:
             self.aborted_jobs = 0
+            self.last_aborted_job = datetime.now()
         self.aborted_jobs += 1
-        self.last_aborted_job = datetime.now()
         # These are accumulating too fast at 5. Increasing to 20
         dropped_job_threshold = 60
         if raid.active:
