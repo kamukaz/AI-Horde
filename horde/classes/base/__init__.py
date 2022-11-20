@@ -372,7 +372,10 @@ class ProcessingGeneration:
             return        
         self.faulted = True
         self.worker.log_aborted_job()
-        logger.info(f"Aborted Stale Generation from by worker: {self.worker.name} ({self.worker.id})")
+        self.log_aborted_generation()
+
+    def log_aborted_generation(self):
+        logger.info(f"Aborted Stale Generation {self.id} from by worker: {self.worker.name} ({self.worker.id})")
 
     # Overridable function
     def get_gen_kudos(self):

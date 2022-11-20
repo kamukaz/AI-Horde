@@ -187,7 +187,6 @@ class WaitingPrompt(WaitingPrompt):
             self.job_ttl = 200
 
     def log_faulted_job(self):
-        '''Extendable function to log why a request was aborted'''
         source_processing = 'txt2img'
         if self.source_image:
             source_processing = self.source_processing
@@ -211,6 +210,8 @@ class ProcessingGeneration(ProcessingGeneration):
         # We have pre-calculated them as they don't change per worker
         return(self.owner.kudos)
 
+    def log_aborted_generation(self):
+        logger.info(f"Aborted Stale Generation {self.id} ({self.owner.width}x{self.owner.height}x{self.owner.steps}@{self.owner.sampler}) from by worker: {self.worker.name} ({self.worker.id})")
 
 class Worker(Worker):
 
