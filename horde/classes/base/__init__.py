@@ -660,9 +660,9 @@ class Worker:
         self.aborted_jobs += 1
         self.last_aborted_job = datetime.now()
         # These are accumulating too fast at 5. Increasing to 20
-        dropped_job_threshold = 10
+        dropped_job_threshold = 60
         if raid.active:
-            dropped_job_threshold = 5
+            dropped_job_threshold = 10
         if self.aborted_jobs > dropped_job_threshold:
             # if a worker drops too many jobs in an hour, we put them in maintenance
             # except during a raid, as we don't want them to know we detected them.
@@ -751,6 +751,7 @@ class Worker:
             "uptime": self.uptime,
             "paused": self.paused,
             "maintenance": self.maintenance,
+            "maintenance_msg": self.maintenance_msg,
             "threads": self.threads,
             "info": self.info,
             "nsfw": self.nsfw,
@@ -776,6 +777,7 @@ class Worker:
         self.id = saved_dict["id"]
         self.uptime = saved_dict.get("uptime",0)
         self.maintenance = saved_dict.get("maintenance",False)
+        self.maintenance_msg = saved_dict.get("maintenance_msg",self.default_maintenance_msg)
         self.threads = saved_dict.get("threads",1)
         self.paused = saved_dict.get("paused",False)
         self.info = saved_dict.get("info",None)
