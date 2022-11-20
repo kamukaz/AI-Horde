@@ -1154,7 +1154,7 @@ class User:
             return(False)
 
     def get_concurrency(self, models_requested = [], models_dict = {}):
-        if not self.is_anon():
+        if not self.is_anon() or len(models_requested) == 0:
             return(self.concurrency)
         found_workers = []
         for model_name in models_requested:
