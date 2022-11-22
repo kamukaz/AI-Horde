@@ -663,7 +663,7 @@ class Worker:
             self.last_aborted_job = datetime.now()
         self.aborted_jobs += 1
         # These are accumulating too fast at 5. Increasing to 20
-        dropped_job_threshold = 60
+        dropped_job_threshold = 20
         if raid.active:
             dropped_job_threshold = 10
         if self.aborted_jobs > dropped_job_threshold:
