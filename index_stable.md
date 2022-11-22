@@ -61,8 +61,6 @@ You can make a copy of `cliRequestData_template.py` into `cliRequestData.py` and
         * [Unreal Engine Plugin](https://github.com/Mystfit/Unreal-StableDiffusionTools)
     * Other
         * [npm SDK](https://www.npmjs.com/package/@zeldafan0225/stable_horde)
-        * [Horde Leaderboard](https://aqualxx.github.io/Horde-Overseer/)
-
 
 ## REST API
 
