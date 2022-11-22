@@ -340,6 +340,16 @@ class News(News):
 
     STABLE_HORDE_NEWS = [
         {
+            "date_published": "2022-11-22",
+            "newspiece": "A new Stable Horde Bot has been deployed, this time for Mastodon. You can find [the stablehorde_generator}(https://sigmoid.social/@stablehorde_generator) as well as our [official Stable Horde account](https://sigmoid.social/@stablehorde) on sigmoid.social",
+            "importance": "Information"
+        },
+        {
+            "date_published": "2022-11-22",
+            "newspiece": "We now have [support for the Unreal Engine](https://github.com/Mystfit/Unreal-StableDiffusionTools/releases/tag/v0.5.0) via a community-provided plugin",
+            "importance": "Information"
+        },
+        {
             "date_published": "2022-11-18",
             "newspiece": "The stable horde [now supports post-processing](https://www.patreon.com/posts/post-processing-74815675) on images automatically",
             "importance": "Information"
