@@ -352,7 +352,7 @@ class Models(Resource):
     @logger.catch(reraise=True)
     def get(self):
         # Old style, using new class
-        models = _db.get_available_models()
+        models = _db.get_available_models(waiting_prompts)
         mdict = {}
         for model in models:
             mdict[model['name']] = model['count']
