@@ -1,12 +1,12 @@
-from profanity_check  import predict
+# from profanity_check  import predict
 from better_profanity import profanity
 profanity.load_censor_words()
 
 def is_profane(text):
     if profanity.contains_profanity(text):
         return(True)
-    if predict([text]) == [1]:
-        return(True)
+    # if predict([text]) == [1]:
+    #     return(True)
     return(False)            
 
 def count_digits(number):
