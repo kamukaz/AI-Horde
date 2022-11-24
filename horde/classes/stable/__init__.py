@@ -146,6 +146,9 @@ class WaitingPrompt(WaitingPrompt):
         max_res = 1124 - round(queue * 0.9)
         if max_res < 576:
             max_res = 576
+            # SD 2.0 requires at least 768 to do its thing
+            if max_res < 768 and len(self.models) > 1 and "stable_diffusion_2.0" in self.models:
+                max_res = 768
         if max_res > 1024:
             max_res = 1024
         if self.get_accurate_steps() > 50:

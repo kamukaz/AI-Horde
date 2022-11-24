@@ -66,6 +66,11 @@ class UnsupportedSampler(wze.BadRequest):
         self.specific = f"This sampler is not supported in this mode the moment"
         self.log = None
 
+class UnsupportedModel(wze.BadRequest):
+    def __init__(self):
+        self.specific = f"This model is not supported in this mode the moment"
+        self.log = None
+
 class InvalidAPIKey(wze.Unauthorized):
     def __init__(self, subject):
         self.specific = "No user matching sent API Key. Have you remembered to register at https://stablehorde.net/register ?"
