@@ -13,12 +13,15 @@ class WaitingPrompt(WaitingPrompt):
             self.n = 20
         self.width = params.get("width", 512)
         self.height = params.get("height", 512)
+        self.models = kwargs.get("models", ['stable_diffusion'])
         self.sampler = params.get('sampler_name', 'k_euler')
+        # Silent change
+        if self.models == ["stable_diffusion_2.0"]:
+            self.sampler = "dpmsolver"
         # The total amount of to pixelsteps requested.
         self.source_image = kwargs.get("source_image", None)
         self.source_processing = kwargs.get("source_processing", 'img2img')
         self.source_mask = kwargs.get("source_mask", None)
-        self.models = kwargs.get("models", ['stable_diffusion'])
         self.censor_nsfw = kwargs.get("censor_nsfw", True)
         self.seed = None
         if 'seed' in params and params['seed'] != None:

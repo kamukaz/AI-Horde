@@ -68,8 +68,8 @@ class AsyncGenerate(AsyncGenerate):
                 raise e.UnsupportedModel
         if self.args.models != ["stable_diffusion_2.0"] and self.params.get("sampler_name") in ["dpmsolver"]:
             raise e.UnsupportedSampler
-        if self.args.models == ["stable_diffusion_2.0"] and self.params.get("sampler_name") not in ["dpmsolver"]:
-            raise e.UnsupportedSampler
+        # if self.args.models == ["stable_diffusion_2.0"] and self.params.get("sampler_name") not in ["dpmsolver"]:
+        #     raise e.UnsupportedSampler
         if len(self.args['prompt'].split()) > 500:
             raise e.InvalidPromptSize(self.username)
 
