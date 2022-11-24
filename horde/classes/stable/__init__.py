@@ -346,6 +346,16 @@ class News(News):
 
     STABLE_HORDE_NEWS = [
         {
+            "date_published": "2022-11-24",
+            "newspiece": "Due to the massive increase in demand from the Horde, we have to limit the amount of concurrent anonymous requests we can serve. We will revert this once our infrastructure can scale better.",
+            "importance": "Information"
+        },
+        {
+            "date_published": "2022-11-24",
+            "newspiece": "Stable Diffusion 2.0 has been released and now it is available on the Horde as well.",
+            "importance": "Information"
+        },
+        {
             "date_published": "2022-11-22",
             "newspiece": "A new Stable Horde Bot has been deployed, this time for Mastodon. You can find [the stablehorde_generator}(https://sigmoid.social/@stablehorde_generator) as well as our [official Stable Horde account](https://sigmoid.social/@stablehorde) on sigmoid.social",
             "importance": "Information"
