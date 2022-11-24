@@ -348,7 +348,7 @@ class News(News):
         {
             "date_published": "2022-11-24",
             "newspiece": "Due to the massive increase in demand from the Horde, we have to limit the amount of concurrent anonymous requests we can serve. We will revert this once our infrastructure can scale better.",
-            "importance": "Information"
+            "importance": "Crisis"
         },
         {
             "date_published": "2022-11-24",
