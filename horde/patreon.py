@@ -48,7 +48,7 @@ class PatreonCache(PrimaryTimedFunction):
         if not self.is_patron(user_id):
             return 0
         eamount = int(self.patrons[user_id]["entitlement_amount"] )
-        if eamount == 25:
+        if eamount == 25 or eamount == 30: # Temp for mistake
             return(300000)
         if eamount == 24:
             return(200000)
@@ -64,5 +64,5 @@ class PatreonCache(PrimaryTimedFunction):
 patrons = PatreonCache(3600, None)
 # We call it now to ensure the cache if full when the monthly kudos assignment is done because the thread take a second longer to fire than the import
 patrons.call_function()
-# pp = pprint.PrettyPrinter(depth=3)
-# pp.pprint(patrons.patrons)
+pp = pprint.PrettyPrinter(depth=3)
+pp.pprint(patrons.patrons)
