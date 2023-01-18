@@ -4,6 +4,7 @@ import regex as re
 import time
 import random
 from datetime import datetime
+from sqlalchemy.exc import IntegrityError
 
 from horde.database import functions as database
 from flask import request
@@ -11,15 +12,16 @@ from flask_restx import Namespace, Resource, reqparse
 from horde.flask import cache, db, HORDE
 from horde.limiter import limiter
 from horde.logger import logger
-from horde.argparser import maintenance, invite_only, raid
+from horde.argparser import args, maintenance, invite_only, raid
 from horde.apis import ModelsV2, ParsersV2
 from horde.apis import exceptions as e
-from horde.classes import stats, Worker, Team, WaitingPrompt, News, User
+from horde.classes import stats, Worker, Team, WaitingPrompt, News, User, Filter
 from horde.suspicions import Suspicions
 from horde.utils import is_profane, sanitize_string
 from horde.countermeasures import CounterMeasures
 from horde.horde_redis import horde_r
 from horde.patreon import patrons
+from horde.detection import prompt_checker
 
 # Not used yet
 authorizations = {
@@ -69,6 +71,7 @@ handle_invalid_procgen = api.errorhandler(e.InvalidJobID)(e.handle_bad_requests)
 handle_request_not_found = api.errorhandler(e.RequestNotFound)(e.handle_bad_requests)
 handle_worker_not_found = api.errorhandler(e.WorkerNotFound)(e.handle_bad_requests)
 handle_team_not_found = api.errorhandler(e.TeamNotFound)(e.handle_bad_requests)
+handle_thing_not_found = api.errorhandler(e.ThingNotFound)(e.handle_bad_requests)
 handle_user_not_found = api.errorhandler(e.UserNotFound)(e.handle_bad_requests)
 handle_duplicate_gen = api.errorhandler(e.DuplicateGen)(e.handle_bad_requests)
 handle_request_expired = api.errorhandler(e.RequestExpired)(e.handle_bad_requests)
@@ -76,20 +79,21 @@ handle_too_many_prompts = api.errorhandler(e.TooManyPrompts)(e.handle_bad_reques
 handle_no_valid_workers = api.errorhandler(e.NoValidWorkers)(e.handle_bad_requests)
 handle_no_valid_actions = api.errorhandler(e.NoValidActions)(e.handle_bad_requests)
 handle_maintenance_mode = api.errorhandler(e.MaintenanceMode)(e.handle_bad_requests)
-
-regex_blacklists1 = []
-regex_blacklists2 = []
-if os.getenv("BLACKLIST1A"):
-    for blacklist in ["BLACKLIST1A","BLACKLIST1B"]:
-        regex_blacklists1.append(re.compile(os.getenv(blacklist), re.IGNORECASE))
-if os.getenv("BLACKLIST2A"):
-    for blacklist in ["BLACKLIST2A"]:
-        regex_blacklists2.append(re.compile(os.getenv(blacklist), re.IGNORECASE))
+locked = api.errorhandler(e.Locked)(e.handle_bad_requests)
 
 # Used to for the flask limiter, to limit requests per url paths
 def get_request_path():
     # logger.info(dir(request))
     return(f"{request.remote_addr}@{request.method}@{request.path}")
+
+def check_for_mod(api_key, operation):
+    mod = database.find_user_by_api_key(api_key)
+    if not mod:
+        raise e.InvalidAPIKey('User action: ' + operation)
+    if not mod.moderator and not args.insecure:
+        raise e.NotModerator(mod.get_unique_alias(), operation)
+    return mod
+
 
 # I have to put it outside the class as I can't figure out how to extend the argparser and also pass it to the @api.expect decorator inside the class
 class GenerateTemplate(Resource):
@@ -156,16 +160,7 @@ class GenerateTemplate(Resource):
             if ip_timeout:
                 raise e.TimeoutIP(self.user_ip, ip_timeout)
             #logger.warning(datetime.utcnow())
-            prompt_suspicion = 0
-            if "###" in self.args.prompt:
-                prompt, negprompt = self.args.prompt.split("###", 1)
-            else:
-                prompt = self.args.prompt
-            for blacklist_regex in [regex_blacklists1, regex_blacklists2]:
-                for blacklist in blacklist_regex:
-                    if blacklist.search(prompt):
-                        prompt_suspicion += 1
-                        break
+            prompt_suspicion, _ = prompt_checker(self.args.prompt)
             #logger.warning(datetime.utcnow())
             if prompt_suspicion >= 2:
                 # Moderators do not get ip blocked to allow for experiments
@@ -778,7 +773,10 @@ class WorkerSingle(Resource):
             'deleted_id': worker.id,
             'deleted_name': worker.name,
         }
-        worker.delete()
+        try:
+            worker.delete()
+        except IntegrityError:
+            raise e.Locked("Could not delete the worker at this point as it's referenced by a job it completed. Please try again after 20 mins.")
         return(ret_dict, 200)
 
 class Users(Resource):
@@ -1277,14 +1275,140 @@ class OperationsIP(Resource):
         Only usable by horde moderators
         '''
         self.args = self.delete_parser.parse_args()
-        mod = database.find_user_by_api_key(self.args['apikey'])
-        if not mod:
-            raise e.InvalidAPIKey('User action: ' + 'DELETE OperationsIP')
-        if not mod.moderator:
-            raise e.NotModerator(mod.get_unique_alias(), 'DELETE OperationsIP')
+        check_for_mod(self.args.apikey, 'DELETE OperationsIP')
         CounterMeasures.delete_timeout(self.args.ipaddr)
         return({"message":'OK'}, 200)
 
+class Filters(Resource):
+    get_parser = reqparse.RequestParser()
+    get_parser.add_argument("apikey", type=str, required=True, help="A mod API key", location='headers')
+    get_parser.add_argument("Client-Agent", default="unknown:0:unknown", type=str, required=False, help="The client name and version", location="headers")
+    get_parser.add_argument("filter_type", type=int, required=False, help="The filter type", location="args")
+
+    # decorators = [limiter.limit("20/minute")]
+    @api.expect(get_parser)
+    @api.marshal_with(models.response_model_filter_details, code=200, description='Filters List', as_list=True, skip_none=True)
+    def get(self):
+        '''Moderator Only: A List all filters, or filtered by the query
+        '''
+        self.args = self.get_parser.parse_args()
+        check_for_mod(self.args.apikey, 'GET Filter')
+        return([f.get_details() for f in Filter.query.all()],200)
+
+    put_parser = reqparse.RequestParser()
+    put_parser.add_argument("apikey", type=str, required=True, help="A mod API key", location='headers')
+    put_parser.add_argument("Client-Agent", default="unknown:0:unknown", type=str, required=False, help="The client name and version", location="headers")
+    put_parser.add_argument("regex", type=str, required=True, help="The filter regex", location="json")
+    put_parser.add_argument("filter_type", type=int, required=True, help="The filter type", location="json")
+    put_parser.add_argument("description", type=str, required=False, help="Optional description about this filter", location="json")
+
+    # decorators = [limiter.limit("20/minute")]
+    @api.expect(put_parser,models.input_model_filter_put, validate=True)
+    @api.marshal_with(models.response_model_filter_details, code=201, description='New Filter details')
+    def put(self):
+        '''Moderator Only: Add a new regex filter
+        '''
+        self.args = self.put_parser.parse_args()
+        mod = check_for_mod(self.args.apikey, 'PUT Filter')
+        new_filter = Filter.query.filter_by(regex=self.args.regex, filter_type=self.args.filter_type).first()
+        if not new_filter:
+            new_filter = Filter(
+                regex = self.args.regex,
+                filter_type = self.args.filter_type,
+                description = self.args.description,
+                user_id = mod.id,
+            )
+            db.session.add(new_filter)
+            db.session.commit()
+            logger.info(f"Mod {mod.get_unique_alias()} added new filter {new_filter.id}")
+        return(new_filter.get_details(),200)
+
+    post_parser = reqparse.RequestParser()
+    post_parser.add_argument("apikey", type=str, required=True, help="A mod API key", location='headers')
+    post_parser.add_argument("Client-Agent", default="unknown:0:unknown", type=str, required=False, help="The client name and version", location="headers")
+    post_parser.add_argument("prompt", type=str, required=True, help="The prompt to check", location="json")
+
+    # decorators = [limiter.limit("20/minute")]
+    @api.expect(post_parser)
+    @api.marshal_with(models.response_model_prompt_suspicion, code=200, description='Returns the suspicion of the provided prompt. A suspicion over 2 means it would be blocked.')
+    def post(self):
+        '''Moderator Only: Check The suspicion of the provided prompt
+        '''
+        self.args = self.post_parser.parse_args()
+        mod = check_for_mod(self.args.apikey, 'POST Filter')
+        suspicion, matches = prompt_checker(self.args.prompt)
+        logger.info(f"Mod {mod.get_unique_alias()} checked prompt {self.args.prompt}")
+        return({"suspicion": suspicion, "matches": matches},200)
+
+class FilterSingle(Resource):
+    get_parser = reqparse.RequestParser()
+    get_parser.add_argument("apikey", type=str, required=True, help="A mod API key", location='headers')
+    get_parser.add_argument("Client-Agent", default="unknown:0:unknown", type=str, required=False, help="The client name and version", location="headers")
+
+    # decorators = [limiter.limit("20/minute")]
+    @cache.cached(timeout=10)
+    @api.expect(get_parser)
+    @api.marshal_with(models.response_model_filter_details, code=200, description='Filters List', as_list=True, skip_none=True)
+    def get(self, filter_id):
+        '''Moderator Only: Display a single filter
+        '''
+        self.args = self.get_parser.parse_args()
+        check_for_mod(self.args.apikey, 'GET FilterSingle')
+        filter = Filter.query.filter_by(id=filter_id).first()
+        if not filter:
+            raise e.ThingNotFound('Filter', filter_id)
+        return(filter.get_details(),200)
+
+    patch_parser = reqparse.RequestParser()
+    patch_parser.add_argument("apikey", type=str, required=True, help="A mod API key", location='headers')
+    patch_parser.add_argument("Client-Agent", default="unknown:0:unknown", type=str, required=False, help="The client name and version", location="headers")
+    patch_parser.add_argument("regex", type=str, required=False, help="The filter regex", location="json")
+    patch_parser.add_argument("filter_type", type=int, required=False, help="The filter type", location="json")
+    patch_parser.add_argument("description", type=str, required=False, help="Optional description about this filter", location="json")
+
+    # decorators = [limiter.limit("20/minute")]
+    @api.expect(patch_parser,models.input_model_filter_patch, validate=True)
+    @api.marshal_with(models.response_model_filter_details, code=200, description='Patched Filter details')
+    def patch(self, filter_id):
+        '''Moderator Only: Modify an existing regex filter
+        '''
+        self.args = self.patch_parser.parse_args()
+        mod = check_for_mod(self.args.apikey, 'PATCH FilterSingle')
+        filter = Filter.query.filter_by(id=filter_id).first()
+        if not filter:
+            raise e.ThingNotFound('Filter', filter_id)
+        if not self.args.filter_type and not self.args.regex and not self.args.description:
+            raise e.NoValidActions("No filter patching selected!")
+        filter.user_id = mod.id,
+        if self.args.filter_type:
+            filter.filter_type = self.args.filter_type
+        if self.args.regex:
+            filter.regex = self.args.regex
+        if self.args.description:
+            filter.description = self.args.description
+        db.session.commit()
+        logger.info(f"Mod {mod.get_unique_alias()} modified filter {filter.id}")
+        return(filter.get_details(),200)
+
+    delete_parser = reqparse.RequestParser()
+    delete_parser.add_argument("apikey", type=str, required=True, help="A mod API key", location='headers')
+    delete_parser.add_argument("Client-Agent", default="unknown:0:unknown", type=str, required=False, help="The client name and version", location="headers")
+
+    # decorators = [limiter.limit("20/minute")]
+    @api.expect(delete_parser)
+    @api.marshal_with(models.response_model_simple_response, code=200, description='Filter Deleted')
+    def delete(self, filter_id):
+        '''Moderator Only: Delete a regex filter
+        '''
+        self.args = self.delete_parser.parse_args()
+        mod = check_for_mod(self.args.apikey, 'DELETE FilterSingle')
+        filter = Filter.query.filter_by(id=filter_id).first()
+        if not filter:
+            raise e.ThingNotFound('Filter', filter_id)
+        logger.info(f"Mod {mod.get_unique_alias()} deleted filter {filter.id}")            
+        db.session.delete(filter)
+        db.session.commit()
+        return({"message": "OK"},200)
 
 class Heartbeat(Resource):
     get_parser = reqparse.RequestParser()
